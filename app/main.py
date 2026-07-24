@@ -55,6 +55,18 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    tb = traceback.format_exc()
+    print(f"Unhandled error: {exc}\n{tb}")
+    return Response(
+        content='{"success":false,"message":"' + str(exc).replace('"', "'") + '"}',
+        status_code=500,
+        media_type="application/json",
+    )
+
+
 @app.on_event("startup")
 async def startup():
     await init_db()
