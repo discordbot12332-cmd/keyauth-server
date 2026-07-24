@@ -128,6 +128,11 @@ async def generate_license(request: Request, db: AsyncSession = Depends(get_db))
         return _resp(False, "appId is required")
     app_id = int(app_id)
 
+    result = await db.execute(select(Application).where(Application.id == app_id))
+    app = result.scalar_one_or_none()
+    if not app:
+        return _resp(False, "Application not found")
+
     lic_svc = LicenseService(db)
     subscription = body.get("subscription", "day")
     if subscription not in VALID_SUBSCRIPTIONS:
@@ -144,7 +149,7 @@ async def generate_license(request: Request, db: AsyncSession = Depends(get_db))
         expiry=expiry,
         note=body.get("note", ""),
     )
-    return _resp(True, "License generated", json.dumps({"key": lic.key}))
+    return _resp(True, "License generated", json.dumps({"key": lic.key, "app_name": app.name}))
 
 
 @router.post("/generate-bulk-licenses")
@@ -156,6 +161,11 @@ async def generate_bulk(request: Request, db: AsyncSession = Depends(get_db)):
     app_id = int(body.get("appId", 0))
     if not app_id:
         return _resp(False, "appId is required")
+
+    result = await db.execute(select(Application).where(Application.id == app_id))
+    app = result.scalar_one_or_none()
+    if not app:
+        return _resp(False, "Application not found")
 
     lic_svc = LicenseService(db)
     count = int(body.get("count", 10))
@@ -177,7 +187,7 @@ async def generate_bulk(request: Request, db: AsyncSession = Depends(get_db)):
         note=body.get("note", ""),
         count=count,
     )
-    return _resp(True, f"{len(licenses)} licenses generated", json.dumps([l.key for l in licenses]))
+    return _resp(True, f"{len(licenses)} licenses generated", json.dumps({"keys": [l.key for l in licenses], "app_name": app.name}))
 
 
 @router.post("/revoke-license")
