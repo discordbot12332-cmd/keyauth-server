@@ -158,10 +158,13 @@ class LicenseService:
         if lic.disabled:
             return False, "License is disabled", None
         now = datetime.now(timezone.utc)
-        if lic.expiry_time and lic.expiry_time < now:
+        expiry = lic.expiry_time
+        if expiry and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry and expiry < now:
             lic.expiry_time = now + timedelta(days=days)
-        elif lic.expiry_time:
-            lic.expiry_time = lic.expiry_time + timedelta(days=days)
+        elif expiry:
+            lic.expiry_time = expiry + timedelta(days=days)
         else:
             lic.expiry_time = now + timedelta(days=days)
         await self.db.commit()
