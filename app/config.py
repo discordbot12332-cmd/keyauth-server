@@ -3,8 +3,15 @@ import secrets
 
 class Settings:
     _raw_db: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./keyauth.db")
-    # Render gives postgres://... but asyncpg needs postgresql+asyncpg://
-    DATABASE_URL: str = _raw_db.replace("postgres://", "postgresql+asyncpg://") if _raw_db.startswith("postgres://") else _raw_db
+    # Render/Neon/Supabase give postgres:// or postgresql://, asyncpg needs postgresql+asyncpg://
+    if _raw_db.startswith("postgres://"):
+        DATABASE_URL: str = "postgresql+asyncpg://" + _raw_db[len("postgres://"):]
+    elif _raw_db.startswith("postgresql://"):
+        DATABASE_URL: str = "postgresql+asyncpg://" + _raw_db[len("postgresql://"):]
+    else:
+        DATABASE_URL: str = _raw_db
+    # asyncpg uses ssl= not sslmode=
+    DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_hex(32))
 
     _raw_key: str = os.getenv("ENCRYPTION_KEY", "")
