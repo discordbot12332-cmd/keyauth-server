@@ -1,9 +1,16 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import License
 from app.services.crypto import generate_license_key
+
+SUBSCRIPTION_DURATIONS = {
+    "day": timedelta(days=1),
+    "weekly": timedelta(weeks=1),
+    "monthly": timedelta(days=30),
+    "yearly": timedelta(days=365),
+}
 
 
 class LicenseService:
@@ -11,9 +18,11 @@ class LicenseService:
         self.db = db
 
     async def generate_license(
-        self, app_id: int, subscription: str = "", max_uses: int = 1,
+        self, app_id: int, subscription: str = "day", max_uses: int = 1,
         expiry: datetime | None = None, note: str = ""
     ) -> License:
+        if not expiry and subscription in SUBSCRIPTION_DURATIONS:
+            expiry = datetime.now(timezone.utc) + SUBSCRIPTION_DURATIONS[subscription]
         lic = License(
             key=generate_license_key(),
             application_id=app_id,
@@ -31,6 +40,8 @@ class LicenseService:
         self, app_id: int, subscription: str, max_uses: int,
         expiry: datetime | None, note: str, count: int
     ) -> list[License]:
+        if not expiry and subscription in SUBSCRIPTION_DURATIONS:
+            expiry = datetime.now(timezone.utc) + SUBSCRIPTION_DURATIONS[subscription]
         licenses = []
         for _ in range(count):
             lic = License(
@@ -133,3 +144,26 @@ class LicenseService:
             )
         )
         return len(result.scalars().all())
+
+    async def add_time(self, app_id: int, license_key: str, days: int) -> tuple[bool, str, License | None]:
+        result = await self.db.execute(
+            select(License).where(
+                License.key == license_key,
+                License.application_id == app_id,
+            )
+        )
+        lic = result.scalar_one_or_none()
+        if not lic:
+            return False, "License not found", None
+        if lic.disabled:
+            return False, "License is disabled", None
+        now = datetime.now(timezone.utc)
+        if lic.expiry_time and lic.expiry_time < now:
+            lic.expiry_time = now + timedelta(days=days)
+        elif lic.expiry_time:
+            lic.expiry_time = lic.expiry_time + timedelta(days=days)
+        else:
+            lic.expiry_time = now + timedelta(days=days)
+        await self.db.commit()
+        await self.db.refresh(lic)
+        return True, f"Added {days} days", lic

@@ -15,6 +15,8 @@ from app.config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+VALID_SUBSCRIPTIONS = {"day", "weekly", "monthly", "yearly"}
+
 
 def _resp(success: bool, message: str = "", data: str | None = None):
     return {"success": success, "message": message, "data": data}
@@ -127,6 +129,9 @@ async def generate_license(request: Request, db: AsyncSession = Depends(get_db))
     app_id = int(app_id)
 
     lic_svc = LicenseService(db)
+    subscription = body.get("subscription", "day")
+    if subscription not in VALID_SUBSCRIPTIONS:
+        return _resp(False, f"Invalid subscription. Must be one of: {', '.join(VALID_SUBSCRIPTIONS)}")
     expiry = body.get("expiry")
     if expiry:
         from datetime import datetime
@@ -134,7 +139,7 @@ async def generate_license(request: Request, db: AsyncSession = Depends(get_db))
 
     lic = await lic_svc.generate_license(
         app_id=app_id,
-        subscription=body.get("subscription", ""),
+        subscription=subscription,
         max_uses=int(body.get("maxUses", 1)),
         expiry=expiry,
         note=body.get("note", ""),
@@ -155,6 +160,10 @@ async def generate_bulk(request: Request, db: AsyncSession = Depends(get_db)):
     lic_svc = LicenseService(db)
     count = int(body.get("count", 10))
 
+    subscription = body.get("subscription", "day")
+    if subscription not in VALID_SUBSCRIPTIONS:
+        return _resp(False, f"Invalid subscription. Must be one of: {', '.join(VALID_SUBSCRIPTIONS)}")
+
     expiry = body.get("expiry")
     if expiry:
         from datetime import datetime
@@ -162,7 +171,7 @@ async def generate_bulk(request: Request, db: AsyncSession = Depends(get_db)):
 
     licenses = await lic_svc.generate_bulk(
         app_id=app_id,
-        subscription=body.get("subscription", ""),
+        subscription=subscription,
         max_uses=int(body.get("maxUses", 1)),
         expiry=expiry,
         note=body.get("note", ""),
@@ -275,3 +284,26 @@ async def ban_user(request: Request, db: AsyncSession = Depends(get_db)):
     user.ban_reason = body.get("reason", "Banned by admin")
     await db.commit()
     return _resp(True, f"User {user.username} banned")
+
+
+@router.post("/add-time")
+async def add_time(request: Request, db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    if not _check_auth(body.get("adminSecret", "")):
+        return _resp(False, "Invalid admin credentials")
+
+    app_id = int(body.get("appId", 0))
+    key = body.get("key", "")
+    days = int(body.get("days", 0))
+    if days <= 0:
+        return _resp(False, "Days must be positive")
+
+    lic_svc = LicenseService(db)
+    success, message, lic = await lic_svc.add_time(app_id, key, days)
+    if not success:
+        return _resp(False, message)
+
+    return _resp(True, message, json.dumps({
+        "key": lic.key,
+        "expiry": lic.expiry_time.isoformat() if lic.expiry_time else None,
+    }))
