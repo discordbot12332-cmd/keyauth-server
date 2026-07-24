@@ -2,7 +2,9 @@ import os
 import secrets
 
 class Settings:
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./keyauth.db")
+    _raw_db: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./keyauth.db")
+    # Render gives postgres://... but asyncpg needs postgresql+asyncpg://
+    DATABASE_URL: str = _raw_db.replace("postgres://", "postgresql+asyncpg://") if _raw_db.startswith("postgres://") else _raw_db
     SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_hex(32))
 
     _raw_key: str = os.getenv("ENCRYPTION_KEY", "")

@@ -16,4 +16,10 @@ services:
       - key: DEBUG
         value: "false"
       - key: DATABASE_URL
-        value: "sqlite+aiosqlite:///./keyauth.db"
+        fromDatabase:
+          name: keyauth-db
+          property: connectionString
+
+databases:
+  - name: keyauth-db
+    plan: free
