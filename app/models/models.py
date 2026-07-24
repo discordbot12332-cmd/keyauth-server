@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 from app.database import Base
+from app.utc import utcnow
 
 
 class Application(Base):
@@ -26,7 +26,7 @@ class Application(Base):
     download_enabled = Column(Boolean, default=False)
     download_url = Column(Text, default="")
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
 
     licenses = relationship("License", back_populates="application", cascade="all, delete-orphan")
     users = relationship("User", back_populates="application", cascade="all, delete-orphan")
@@ -52,7 +52,7 @@ class License(Base):
     ip_list = Column(Text, default="")
     note = Column(Text, default="")
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
     last_used_at = Column(DateTime, nullable=True)
 
     application = relationship("Application", back_populates="licenses")
@@ -76,7 +76,7 @@ class User(Base):
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
     last_login = Column(DateTime, nullable=True)
 
     application = relationship("Application", back_populates="users")
@@ -100,7 +100,7 @@ class Session(Base):
     platform = Column(String(32), default="")
 
     is_valid = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=utcnow)
     expires_at = Column(DateTime, nullable=False)
 
     application = relationship("Application", back_populates="sessions")
@@ -120,7 +120,7 @@ class Log(Base):
     hwid = Column(String(128), default="")
     meta_info = Column(Text, default="")
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
 
     application = relationship("Application", back_populates="logs")
     user = relationship("User", back_populates="logs")

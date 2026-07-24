@@ -140,7 +140,7 @@ async def generate_license(request: Request, db: AsyncSession = Depends(get_db))
     expiry = body.get("expiry")
     if expiry:
         from datetime import datetime
-        expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00")).replace(tzinfo=None)
 
     lic = await lic_svc.generate_license(
         app_id=app_id,
@@ -177,7 +177,7 @@ async def generate_bulk(request: Request, db: AsyncSession = Depends(get_db)):
     expiry = body.get("expiry")
     if expiry:
         from datetime import datetime
-        expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00")).replace(tzinfo=None)
 
     licenses = await lic_svc.generate_bulk(
         app_id=app_id,

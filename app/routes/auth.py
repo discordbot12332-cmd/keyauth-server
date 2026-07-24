@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
@@ -12,6 +11,7 @@ from app.services.session_service import SessionService
 from app.services.license_service import LicenseService
 from app.services.anti_tamper import AntiTamperService
 from app.config import settings
+from app.utc import utcnow, utc_add
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
@@ -126,16 +126,13 @@ async def login(request: Request, db: AsyncSession = Depends(get_db)):
     if user.banned:
         return _fail(f"Account banned: {user.ban_reason}")
     if user.locked_until:
-        locked = user.locked_until.replace(tzinfo=timezone.utc) if user.locked_until.tzinfo is None else user.locked_until
-        if locked > datetime.now(timezone.utc):
+        if user.locked_until > utcnow():
             return _fail("Account temporarily locked")
 
     if not verify_password(password, user.password_hash):
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= settings.MAX_LOGIN_ATTEMPTS:
-            user.locked_until = datetime.now(timezone.utc).replace(
-                minute=datetime.now(timezone.utc).minute + settings.LOCKOUT_MINUTES
-            )
+            user.locked_until = utc_add(minutes=settings.LOCKOUT_MINUTES)
             user.failed_login_attempts = 0
         await db.commit()
         await anti.log_activity(app.id, user.id, "failed_login", "Invalid password", ip, hwid)
@@ -146,7 +143,7 @@ async def login(request: Request, db: AsyncSession = Depends(get_db)):
                                 f"HWID changed from {user.hwid} to {hwid}", ip, hwid)
 
     user.hwid = hwid
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = utcnow()
     user.ip_address = ip
     user.failed_login_attempts = 0
     user.locked_until = None

@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Log, Application, User
+from app.utc import utcnow
 
 
 class AntiTamperService:
@@ -42,8 +43,7 @@ class AntiTamperService:
         await self.db.commit()
 
     async def get_failed_logins(self, app_id: int, hwid: str, window_minutes: int = 15) -> int:
-        from datetime import timedelta
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+        cutoff = utcnow() - timedelta(minutes=window_minutes)
         result = await self.db.execute(
             select(Log).where(
                 Log.application_id == app_id,

@@ -1,9 +1,10 @@
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Session
 from app.services.crypto import generate_session_token
+from app.utc import utcnow, utc_add
 
 
 class SessionService:
@@ -24,7 +25,7 @@ class SessionService:
             user_agent=user_agent,
             version=version,
             platform=platform,
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=self.token_expiry),
+            expires_at=utc_add(minutes=self.token_expiry),
             is_valid=True,
         )
         self.db.add(session)
@@ -42,8 +43,7 @@ class SessionService:
         session = result.scalar_one_or_none()
         if session is None:
             return None
-        exp = session.expires_at.replace(tzinfo=timezone.utc) if session.expires_at.tzinfo is None else session.expires_at
-        if exp < datetime.now(timezone.utc):
+        if session.expires_at and session.expires_at < utcnow():
             session.is_valid = False
             await self.db.commit()
             return None
@@ -67,7 +67,7 @@ class SessionService:
             select(Session).where(
                 Session.application_id == app_id,
                 Session.is_valid == True,
-                Session.expires_at > datetime.now(timezone.utc),
+                Session.expires_at > utcnow(),
             )
         )
         return len(result.scalars().all())
