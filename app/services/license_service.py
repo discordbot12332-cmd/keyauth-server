@@ -76,13 +76,16 @@ class LicenseService:
             return False, "License is disabled", None
         if lic.expiry_time and lic.expiry_time < utcnow():
             return False, "License has expired", None
-        if lic.used_count >= lic.max_uses and lic.max_uses != -1:
-            return False, "License maximum uses reached", None
-        if lic.hwid and lic.hwid != hwid:
-            return False, "License bound to different HWID", None
 
-        if not lic.hwid:
-            lic.hwid = hwid
+        registered = [h.strip() for h in lic.hwid.split(",") if h.strip()] if lic.hwid else []
+        already_registered = hwid in registered
+
+        if not already_registered:
+            if lic.max_uses != -1 and len(registered) >= lic.max_uses:
+                return False, "License maximum HWID slots reached", None
+            registered.append(hwid)
+            lic.hwid = ",".join(registered)
+
         if user_id and lic.user_id is None:
             lic.user_id = user_id
 
@@ -168,3 +171,18 @@ class LicenseService:
         await self.db.commit()
         await self.db.refresh(lic)
         return True, f"Added {days} days", lic
+
+    async def reset_hwid(self, app_id: int, license_key: str) -> bool:
+        result = await self.db.execute(
+            select(License).where(
+                License.key == license_key,
+                License.application_id == app_id,
+            )
+        )
+        lic = result.scalar_one_or_none()
+        if not lic:
+            return False
+        lic.hwid = ""
+        lic.used_count = 0
+        await self.db.commit()
+        return True

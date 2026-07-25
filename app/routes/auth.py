@@ -1,4 +1,5 @@
 import json
+import time as _time
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.models import Application, User
-from app.services.crypto import decrypt_aes, verify_password, hash_password
+from app.services.crypto import decrypt_aes, verify_password, hash_password, verify_hmac
 from app.services.session_service import SessionService
 from app.services.license_service import LicenseService
 from app.services.anti_tamper import AntiTamperService
@@ -16,10 +17,36 @@ from app.utc import utcnow, utc_add
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 
+def _fail_parse(message: str = ""):
+    return {"success": False, "message": message, "sessionId": None, "data": None}
+
+
 async def _parse(request: Request) -> dict:
-    """Parse request body - supports both encrypted and raw JSON."""
+    """Parse request — AES+HMAC+timestamp (new) or legacy formats."""
     body = await request.json()
     data = body.get("data", "")
+    ts = body.get("ts")
+    sig = body.get("sig", "")
+
+    # New encrypted + signed format
+    if ts is not None and isinstance(data, str) and data and sig:
+        now_ms = int(_time.time() * 1000)
+        if abs(now_ms - int(ts)) > 60000:
+            raise Exception("Request expired")
+        try:
+            plaintext = decrypt_aes(data)
+        except Exception:
+            raise Exception("Decryption failed")
+        enc_key = settings.ENCRYPTION_KEY.decode() if isinstance(settings.ENCRYPTION_KEY, bytes) else str(settings.ENCRYPTION_KEY)
+        if not verify_hmac(data + str(ts), enc_key, sig):
+            raise Exception("Invalid signature")
+        return json.loads(plaintext)
+
+    # Legacy: dict passthrough
+    if isinstance(data, dict):
+        return data
+
+    # Legacy: try decrypt or raw JSON string
     if isinstance(data, str) and data:
         try:
             decoded = decrypt_aes(data)
@@ -29,8 +56,6 @@ async def _parse(request: Request) -> dict:
                 return json.loads(data)
             except Exception:
                 pass
-    if isinstance(data, dict):
-        return data
     return body
 
 

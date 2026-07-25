@@ -317,3 +317,22 @@ async def add_time(request: Request, db: AsyncSession = Depends(get_db)):
         "key": lic.key,
         "expiry": lic.expiry_time.isoformat() if lic.expiry_time else None,
     }))
+
+
+@router.post("/reset-hwid")
+async def reset_hwid(request: Request, db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    if not _check_auth(body.get("adminSecret", "")):
+        return _resp(False, "Invalid admin credentials")
+
+    app_id = int(body.get("appId", 0))
+    key = body.get("key", "")
+    if not key:
+        return _resp(False, "License key is required")
+
+    lic_svc = LicenseService(db)
+    success = await lic_svc.reset_hwid(app_id, key)
+    if not success:
+        return _resp(False, "License not found")
+
+    return _resp(True, f"HWID reset for `{key}`")
