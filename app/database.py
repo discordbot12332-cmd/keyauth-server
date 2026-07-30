@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -30,3 +31,8 @@ async def init_db():
     async with engine.begin() as conn:
         from app.models.models import Application, License, User, Session, Log  # noqa
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate: add min_version column if not exists
+        try:
+            await conn.execute(sa.text("ALTER TABLE applications ADD COLUMN min_version VARCHAR(16) DEFAULT ''"))
+        except Exception:
+            pass  # column already exists
