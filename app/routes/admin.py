@@ -336,3 +336,22 @@ async def reset_hwid(request: Request, db: AsyncSession = Depends(get_db)):
         return _resp(False, "License not found")
 
     return _resp(True, f"HWID reset for `{key}`")
+
+
+@router.post("/set-min-version")
+async def set_min_version(request: Request, db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    if not _check_auth(body.get("adminSecret", "")):
+        return _resp(False, "Invalid admin credentials")
+
+    app_id = int(body.get("appId", 0))
+    version = body.get("version", "")
+
+    result = await db.execute(select(Application).where(Application.id == app_id))
+    app = result.scalar_one_or_none()
+    if not app:
+        return _resp(False, "Application not found")
+
+    app.min_version = version
+    await db.commit()
+    return _resp(True, f"Minimum version set to `{version}`" if version else "Minimum version cleared (any version allowed)")

@@ -74,6 +74,9 @@ def _ok(message: str = "", session_id: str = None, data: str = None):
 def _fail(message: str = ""):
     return {"success": False, "message": message, "sessionId": None, "data": None}
 
+def _fail_update_required(download_url: str = ""):
+    return {"success": False, "message": "Update required", "sessionId": None, "data": json.dumps({"update_required": True, "download_url": download_url})}
+
 
 async def _validate(db: AsyncSession, session_id: str, hwid: str) -> Application | None:
     if not session_id:
@@ -112,6 +115,9 @@ async def init_app(request: Request, db: AsyncSession = Depends(get_db)):
         return _fail("IP not whitelisted")
     if await anti.is_hwid_blacklisted(app.id, hwid):
         return _fail("HWID blacklisted")
+
+    if app.min_version and version < app.min_version:
+        return _fail_update_required(app.download_url)
 
     sess_svc = SessionService(db, settings.TOKEN_EXPIRY_MINUTES)
     session = await sess_svc.create_session(app.id, None, hwid, ip, _ua(request), version, platform)

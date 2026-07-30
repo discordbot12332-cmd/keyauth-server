@@ -23,6 +23,7 @@ class Application(Base):
     ip_whitelist = Column(Text, default="")
 
     sub_disabled = Column(Boolean, default=False)
+    min_version = Column(String(16), default="")
     download_enabled = Column(Boolean, default=False)
     download_url = Column(Text, default="")
 
