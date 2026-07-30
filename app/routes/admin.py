@@ -97,6 +97,7 @@ async def list_apps(adminSecret: str = Query(...), db: AsyncSession = Depends(ge
         "max_users": a.max_users, "total_downloads": a.total_downloads,
         "created_at": a.created_at.isoformat() if a.created_at else None,
         "sub_disabled": a.sub_disabled, "download_enabled": a.download_enabled,
+        "min_version": a.min_version or "",
     } for a in apps]))
 
 
