@@ -15,7 +15,7 @@ from app.config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-VALID_SUBSCRIPTIONS = {"day", "weekly", "monthly", "yearly"}
+VALID_SUBSCRIPTIONS = {"day", "weekly", "monthly", "yearly", "lifetime"}
 
 
 def _resp(success: bool, message: str = "", data: str | None = None):

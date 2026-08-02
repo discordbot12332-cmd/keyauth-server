@@ -11,6 +11,7 @@ SUBSCRIPTION_DURATIONS = {
     "weekly": timedelta(weeks=1),
     "monthly": timedelta(days=30),
     "yearly": timedelta(days=365),
+    "lifetime": None,
 }
 
 
@@ -22,8 +23,9 @@ class LicenseService:
         self, app_id: int, subscription: str = "day", max_uses: int = 1,
         expiry=None, note: str = ""
     ) -> License:
-        if not expiry and subscription in SUBSCRIPTION_DURATIONS:
-            expiry = utc_add(days=SUBSCRIPTION_DURATIONS[subscription].days)
+        duration = SUBSCRIPTION_DURATIONS.get(subscription)
+        if not expiry and duration is not None:
+            expiry = utc_add(days=duration.days)
         lic = License(
             key=generate_license_key(),
             application_id=app_id,
@@ -41,8 +43,9 @@ class LicenseService:
         self, app_id: int, subscription: str, max_uses: int,
         expiry, note: str, count: int
     ) -> list[License]:
-        if not expiry and subscription in SUBSCRIPTION_DURATIONS:
-            expiry = utc_add(days=SUBSCRIPTION_DURATIONS[subscription].days)
+        duration = SUBSCRIPTION_DURATIONS.get(subscription)
+        if not expiry and duration is not None:
+            expiry = utc_add(days=duration.days)
         licenses = []
         for _ in range(count):
             lic = License(
@@ -161,6 +164,8 @@ class LicenseService:
             return False, "License not found", None
         if lic.disabled:
             return False, "License is disabled", None
+        if lic.subscription == "lifetime":
+            return False, "Lifetime license does not expire", None
         now = utcnow()
         if lic.expiry_time and lic.expiry_time < now:
             lic.expiry_time = utc_add(days=days)
