@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routes import auth, admin
+from app.routes import auth, admin, keyauth
 from app.services.rate_limiter import rate_limiter
 
 app = FastAPI(
@@ -53,6 +53,7 @@ async def security_headers(request: Request, call_next):
 
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(keyauth.router)
 
 
 @app.exception_handler(Exception)
